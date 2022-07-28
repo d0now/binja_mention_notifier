@@ -14,8 +14,6 @@ from binaryninja import (
     TextLineField,
     ChoiceField,
     get_form_input,
-    # get_text_line_input,
-    # get_choice_input,
 )
 
 from binaryninja import (
@@ -29,6 +27,8 @@ from binaryninja.collaboration import (
     Project,
     File
 )
+
+from binaryninja import BackgroundTaskThread
 
 import urllib3
 urllib3.disable_warnings()
@@ -170,13 +170,17 @@ class MentionNotifierThread(threading.Thread):
 
         session = binja_api_auth(self.remote.address, self.username, self.password)
         if not session:
+            self.logger.log_error("Failed to authenticated to binaryninja api server.")
             return None
 
-        response = session.post(self.file.chat_log_url, headers={'Accept': 'application/json'})
+        response = session.get(self.file.chat_log_url, headers={'Accept': 'application/json'})
         if response.status_code != 200:
+            self.logger.log_error("Failed to get chat log from binaryninja api server.")
             return None
 
-        for chat_log in response.json:
+        chat_logs = json.loads(response.text)
+
+        for chat_log in chat_logs:
 
             if chat_log['timestamp'] < self.last_check:
                 continue
@@ -186,7 +190,7 @@ class MentionNotifierThread(threading.Thread):
                 continue
 
             start, end = found.span()
-            mentioned = chat_log['message'][start:end]
+            mentioned = chat_log['message'][start+1:end]
             if mentioned != self.username:
                 continue
 
@@ -223,6 +227,16 @@ def start_notifier(bv, *args, **kwargs):
     notifier.start()
     notifiers[bv] = notifier
 
+class NotifierKiller(BackgroundTaskThread):
+
+    def __init__(self, target_thread):
+        self.target_thread = target_thread
+        BackgroundTaskThread.__init__(self)
+
+    def run(self):
+        self.target_thread.running = False
+        self.target_thread.join()
+
 def stop_notifier(bv, *args, **kwargs):
 
     global notifiers
@@ -230,8 +244,7 @@ def stop_notifier(bv, *args, **kwargs):
         show_message_box(INTERACTION_TITLE, "There are no notifier thread running.", icon=MessageBoxIcon.ErrorIcon)
         return
 
-    notifiers[bv].running = False
-    notifiers[bv].join()
+    NotifierKiller(notifiers[bv]).start()
     del notifiers[bv]
 
 if __name__ != '__main__':
