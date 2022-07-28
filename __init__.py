@@ -42,7 +42,8 @@ class MentionNotifierThread(threading.Thread):
 
             noti = list(json.loads(noti).values())[0]
             if self.bv:
-                binaryninja.show_message_box(f"Mention Notifier [{self.name}]", f"{noti['who']} mentioned you at {self.bv.file.filename}")
+                file = binaryninja.collaboration.File.get_for_bv(self.bv)
+                binaryninja.show_message_box(f"Mention Notifier [{self.name}]", f"{noti['who']} mentioned you at {file.projectname}/{file.name}")
                 continue
 
             binaryninja.show_message_box("Mention Notifier", "Someone mentioned you! - but no bv provided")
