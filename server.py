@@ -121,8 +121,8 @@ class ChatEventHandler(BaseHTTPRequestHandler):
         if mentioned:
             s, e = mentioned.span()
             mentioned_to = data['message'][s+1:e]
-            if mentioned_to in sessions and sessions[mentioned_to] >= 0:
-                sessions[mentioned_to] += 1
+            if mentioned_to in sessions and sessions[mentioned_to] == None:
+                sessions[mentioned_to] = data['project_file']
 
     def do_POST(self):
         url = urlparse(self.path)
@@ -141,23 +141,29 @@ class ChatEventHandler(BaseHTTPRequestHandler):
         else:
             username = query['username'][0]
 
+        if 'project_file' not in query:
+            self._set_response_400()
+            return
+        else:
+            project_file = query['project_file'][0]
+
         if username in sessions:
             sessions[username] = -1
             self._set_response_423()
             return
 
-        sessions[username] = 0
+        sessions[username] = None
         session_start = time.time()
 
         while session_start + self.session_timeout > time.time():
 
-            if sessions[username] == 0:
+            if sessions[username] == None:
                 time.sleep(1)
                 continue
-            elif sessions[username] > 0:
+            elif type(sessions[username]) == str and sessions[username] == project_file:
                 if self._set_response_ok():
                     self.wfile.write(str(sessions[username]).encode())
-            elif sessions[username] < 0:
+            elif type(sessions[username]) == int and sessions[username] < 0:
                 self._set_response_423()
             else:
                 self._set_response_500()

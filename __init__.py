@@ -156,8 +156,13 @@ class MentionNotifierThread(threading.Thread):
 
     def _get_notify(self, timeout=60):
 
+        query  = '?'
+        query += 'username=' + self.username
+        query += '&'
+        query += 'project_file=' + self.file.id
+
         try:
-            response = self.session.get(self.notify_url + '/subscribe?username=' + self.username, timeout=timeout)
+            response = self.session.get(self.notify_url + '/subscribe' + query, timeout=timeout)
         except requests.exceptions.ReadTimeout:
             return None
 
@@ -231,7 +236,7 @@ class NotifierKiller(BackgroundTaskThread):
 
     def __init__(self, target_thread):
         self.target_thread = target_thread
-        BackgroundTaskThread.__init__(self)
+        BackgroundTaskThread.__init__(self, "Killing notifier...")
 
     def run(self):
         self.target_thread.running = False
