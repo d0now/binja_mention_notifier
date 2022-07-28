@@ -1,8 +1,24 @@
-import binaryninja
+#!/usr/bin/env python3
+
 import threading
 import requests
 import json
 import time
+
+from binaryninja import (
+    log_info,
+    show_message_box,
+    TextLineField,
+    IntegerField,
+    get_form_input
+)
+
+from binaryninja import (
+    collaboration,
+    is_connected,
+    is_authenticated,
+    username
+)
 
 class MentionNotifierThread(threading.Thread):
 
@@ -31,7 +47,7 @@ class MentionNotifierThread(threading.Thread):
 
     def run(self):
 
-        binaryninja.log_info("mention notifier process start.")
+        log_info("mention notifier process start.")
 
         while self._update():
 
@@ -42,33 +58,33 @@ class MentionNotifierThread(threading.Thread):
 
             noti = list(json.loads(noti).values())[0]
             if self.bv:
-                file = binaryninja.collaboration.File.get_for_bv(self.bv)
-                binaryninja.show_message_box(f"Mention Notifier [{self.name}]", f"{noti['who']} mentioned you at {file.projectname}/{file.name}")
+                file = collaboration.File.get_for_bv(self.bv)
+                show_message_box(f"Mention Notifier [{self.name}]", f"{noti['who']} mentioned you at {file.projectname}/{file.name}")
                 continue
 
-            binaryninja.show_message_box("Mention Notifier", "Someone mentioned you! - but no bv provided")
+            show_message_box("Mention Notifier", "Someone mentioned you! - but no bv provided")
 
-        binaryninja.log_info("mention notifier process dead.")
+        log_info("mention notifier process dead.")
 
     def _update(self):
 
-        if not binaryninja.is_connected():
-            binaryninja.log_info("mention notifier - not connected.")
+        if not is_connected():
+            log_info("mention notifier - not connected.")
             return False
 
-        if not binaryninja.is_authenticated():
-            binaryninja.log_info("mention notifier - not authenticated.")
+        if not is_authenticated():
+            log_info("mention notifier - not authenticated.")
             return False
 
         try:
             response = requests.get(self.baseurl + '/test')
             if response.status_code != 200:
-                binaryninja.log_info("mention notifier - server didn't respond 200.")
+                log_info("mention notifier - server didn't respond 200.")
         except Exception as e:
-            binaryninja.log_info("mention notifier - server not respond.")
+            log_info("mention notifier - server not respond.")
             return False
         
-        self.username = binaryninja.username()
+        self.username = username()
         self.session = requests.Session()
         return True
 
@@ -84,14 +100,15 @@ class MentionNotifierThread(threading.Thread):
 
 def start_notifier(bv, *args, **kwargs):
 
-    host = binaryninja.TextLineField("host")
-    port = binaryninja.IntegerField("port")
-    name = binaryninja.TextLineField("name")
-    if binaryninja.get_form_input(["Server address", None, host, port, name], "Mention Notifier Setup") != True:
+    host = TextLineField("host")
+    port = IntegerField("port")
+    name = TextLineField("name")
+    if get_form_input(["Server address", None, host, port, name], "Mention Notifier Setup") != True:
         return
 
     notifier = MentionNotifierThread(host.result, port.result, name.result, bv=bv)
     notifier.start()
 
-from binaryninja import PluginCommand
-PluginCommand.register("start mention notifier", "", start_notifier)
+if __name__ != '__main__':
+    from binaryninja import PluginCommand
+    PluginCommand.register("start mention notifier", "", start_notifier)
